@@ -1,0 +1,8 @@
+{
+  "name": "E.C.H.O. Voice Studio",
+  "description": "A cinematic voice studio and character voice library for AI audio storytelling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
