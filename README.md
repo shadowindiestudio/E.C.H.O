@@ -1,1 +1,0 @@
-E.C.H.O. (Enhanced Cinematic Human Output) is an open-source AI-powered platform for transforming written stories into immersive, cinematic audio experiences using modular AI pipelines and multi-provider integrations.

@@ -6,3 +6,5 @@ export * from './audio';
 export * from './settings';
 export * from './notifications';
 export * from './pipeline';
+export * from './ai-provider';
+export * from './tts-provider';

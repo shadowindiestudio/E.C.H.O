@@ -15,6 +15,18 @@ export interface Voice {
   createdAt: string;
   providerId?: string; // e.g. elevenlabs, xtts, piper, google
   providerVoiceId?: string;
+  
+  // Advanced Voice Settings
+  accent?: string;
+  pitch?: number;
+  speed?: number;
+  volume?: number;
+  emotion?: string;
+  pauseDuration?: number;
+  pronunciationDictionary?: Record<string, string>;
+  speakingStyle?: string;
+  voiceNotes?: string;
+  age?: 'Child' | 'Young Adult' | 'Adult' | 'Senior';
 }
 
 export type VoiceViewMode = 'grid' | 'list';

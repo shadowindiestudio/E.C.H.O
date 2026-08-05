@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
-import { aiProviderService } from '../../services/aiProviderService';
-import { ttsProviderService } from '../../services/ttsProviderService';
-import { ProviderConfig, SystemSettings } from '../../types';
+import { ttsProviderManager } from '../../services/tts/TTSProviderManager';
+import { aiProviderManager } from '../../services/ai/AIProviderManager';
+import { ProviderConfig, SystemSettings, ProviderConfiguration, TTSProviderConfiguration } from '../../types';
 import { Badge } from '../common/Badge';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
 export const SettingsView: React.FC = () => {
   const {
     aiProviders,
+    aiConfigs,
+    updateAiConfig,
     ttsProviders,
-    updateAiProvider,
-    updateTtsProvider,
+    ttsConfigs,
+    updateTtsConfig,
     systemSettings,
     updateSystemSettings,
   } = useApp();
@@ -23,26 +25,19 @@ export const SettingsView: React.FC = () => {
   const [testingId, setTestingId] = useState<string | null>(null);
 
   // Test AI Provider Connection
-  const handleTestAiConnection = async (provider: ProviderConfig) => {
-    setTestingId(provider.id);
+  const handleTestAiConnection = async (providerId: string) => {
+    setTestingId(providerId);
     try {
-      const res = await aiProviderService.testConnection(provider);
-      const updated = {
-        ...provider,
-        lastTestedAt: res.testedAt,
-        lastTestSuccess: res.success,
-        lastTestMessage: res.message,
-      };
-      updateAiProvider(updated);
-
-      if (res.success) {
+      const res = await aiProviderManager.testConnection(providerId);
+      
+      if (res.health.status === 'connected') {
         addToast(
-          `Connected to ${provider.name}`,
-          `${res.message} (${res.latencyMs || 0}ms)`,
+          `Connected`,
+          `${res.health.message} (${res.health.latencyMs || 0}ms)`,
           'success'
         );
       } else {
-        addToast(`Connection Failed: ${provider.name}`, res.message, 'error');
+        addToast(`Connection Failed`, res.health.message || 'Unknown error', 'error');
       }
     } catch (err) {
       addToast('Test Failed', String(err), 'error');
@@ -52,26 +47,19 @@ export const SettingsView: React.FC = () => {
   };
 
   // Test TTS Provider Synthesis
-  const handleTestTtsSynthesis = async (provider: ProviderConfig) => {
-    setTestingId(provider.id);
+  const handleTestTtsSynthesis = async (providerId: string) => {
+    setTestingId(providerId);
     try {
-      const res = await ttsProviderService.testSynthesis(provider);
-      const updated = {
-        ...provider,
-        lastTestedAt: res.testedAt,
-        lastTestSuccess: res.success,
-        lastTestMessage: res.message,
-      };
-      updateTtsProvider(updated);
+      const res = await ttsProviderManager.testConnection(providerId);
 
-      if (res.success) {
+      if (res.health.status === 'connected') {
         addToast(
-          `TTS Engine Ready: ${provider.name}`,
-          `${res.message} (${res.latencyMs || 0}ms)`,
+          `TTS Engine Ready`,
+          `${res.health.message} (${res.health.latencyMs || 0}ms)`,
           'success'
         );
       } else {
-        addToast(`TTS Test Failed: ${provider.name}`, res.message, 'error');
+        addToast(`TTS Test Failed`, res.health.message || 'Unknown error', 'error');
       }
     } catch (err) {
       addToast('TTS Test Error', String(err), 'error');
@@ -83,7 +71,7 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6">
       {/* Settings Navigation Tabs */}
-      <div className="surface-panel rounded-xl p-3 flex border border-border-slate gap-2 bg-surface-container-lowest">
+      <div className="surface-panel rounded-xl p-3 flex border border-border-slate gap-2 bg-surface-container-lowest flex-wrap">
         <button
           onClick={() => setActiveTab('ai')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-display text-xs font-bold transition-all ${
@@ -93,7 +81,7 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           <span className="material-symbols-outlined text-base">psychology</span>
-          AI LLM Providers ({aiProviders.filter((p) => p.enabled).length})
+          AI LLM Providers ({aiConfigs.filter((p) => p.enabled).length})
         </button>
 
         <button
@@ -105,7 +93,7 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           <span className="material-symbols-outlined text-base">spatial_audio_off</span>
-          TTS Voice Engines ({ttsProviders.filter((p) => p.enabled).length})
+          TTS Voice Engines ({ttsConfigs.filter((p) => p.enabled).length})
         </button>
 
         <button
@@ -132,118 +120,190 @@ export const SettingsView: React.FC = () => {
               </p>
             </div>
             <span className="text-[10px] bg-muted-gold/10 text-muted-gold border border-muted-gold/30 px-2 py-1 rounded font-mono">
-              Full Provider Abstraction Active
+              Modular Provider Architecture Active
             </span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {aiProviders.map((provider) => (
-              <div
-                key={provider.id}
-                className={`surface-panel p-5 rounded-xl border transition-all flex flex-col justify-between ${
-                  provider.enabled ? 'border-border-slate' : 'border-border-slate/40 opacity-70'
-                }`}
-              >
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-muted-gold">smart_toy</span>
-                      <h3 className="font-display font-bold text-on-surface text-sm">{provider.name}</h3>
-                    </div>
+            {aiProviders.map((provider) => {
+              const config = aiConfigs.find(c => c.providerId === provider.id) || {
+                id: crypto.randomUUID(),
+                providerId: provider.id,
+                enabled: false,
+                apiKey: '',
+                baseUrl: '',
+                defaultModelId: '',
+                temperature: 0.7,
+                topP: 1.0,
+                timeoutMs: 30000,
+                retryCount: 3,
+                streamingEnabled: true,
+                favoriteModelIds: [],
+                recentlyUsedModelIds: []
+              } as ProviderConfiguration;
+              
+              const connection = aiProviderManager.getConnection(provider.id);
 
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={provider.enabled}
-                        onChange={(e) =>
-                          updateAiProvider({ ...provider, enabled: e.target.checked })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-matte-black peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-muted-gold"></div>
-                    </label>
+              return (
+                <div
+                  key={provider.id}
+                  className={`surface-panel p-5 rounded-xl border transition-all flex flex-col justify-between ${
+                    config.enabled ? 'border-border-slate' : 'border-border-slate/40 opacity-70'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-muted-gold">smart_toy</span>
+                        <h3 className="font-display font-bold text-on-surface text-sm">{provider.name}</h3>
+                      </div>
+
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.enabled}
+                          onChange={(e) =>
+                            updateAiConfig({ ...config, enabled: e.target.checked })
+                          }
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-matte-black peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-muted-gold"></div>
+                      </label>
+                    </div>
+                    
+                    <p className="text-[10px] text-on-surface-variant mb-4">{provider.description}</p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
+                          Endpoint URL
+                        </label>
+                        <input
+                          type="text"
+                          value={config.baseUrl}
+                          onChange={(e) =>
+                            updateAiConfig({ ...config, baseUrl: e.target.value })
+                          }
+                          className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
+                          API Key
+                        </label>
+                        <input
+                          type="password"
+                          placeholder={provider.category === 'local' ? 'Optional for local endpoints' : 'Enter API Key...'}
+                          value={config.apiKey}
+                          onChange={(e) =>
+                            updateAiConfig({ ...config, apiKey: e.target.value })
+                          }
+                          className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
+                        />
+                      </div>
+
+                      {provider.id === 'openai' && (
+                        <div>
+                          <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
+                            Organization ID (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Enter Organization ID..."
+                            value={config.organizationId || ''}
+                            onChange={(e) =>
+                              updateAiConfig({ ...config, organizationId: e.target.value })
+                            }
+                            className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
+                            Default Model
+                          </label>
+                          <select
+                            value={config.defaultModelId}
+                            onChange={(e) =>
+                              updateAiConfig({ ...config, defaultModelId: e.target.value })
+                            }
+                            className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
+                          >
+                            <option value="">Select model...</option>
+                            {connection?.models?.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
+                            Temperature
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="2"
+                            step="0.1"
+                            value={config.temperature}
+                            onChange={(e) =>
+                              updateAiConfig({ ...config, temperature: parseFloat(e.target.value) || 0 })
+                            }
+                            className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 mt-2">
+                        <input 
+                          type="checkbox" 
+                          id={`stream-${provider.id}`} 
+                          checked={config.streamingEnabled} 
+                          onChange={(e) => updateAiConfig({ ...config, streamingEnabled: e.target.checked })}
+                          className="accent-muted-gold"
+                        />
+                        <label htmlFor={`stream-${provider.id}`} className="text-[10px] text-on-surface-variant cursor-pointer">
+                          Enable Streaming Output
+                        </label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
-                        Endpoint URL
-                      </label>
-                      <input
-                        type="text"
-                        value={provider.endpointUrl}
-                        onChange={(e) =>
-                          updateAiProvider({ ...provider, endpointUrl: e.target.value })
-                        }
-                        className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
-                      />
+                  {/* Status & Test Action */}
+                  <div className="mt-4 pt-3 border-t border-border-slate/60 flex items-center justify-between">
+                    <div className="min-w-0 flex-1 pr-2">
+                      {connection?.health?.lastTestedAt ? (
+                        <span
+                          className={`text-[10px] font-mono truncate block ${
+                            connection.health.status === 'connected' ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {connection.health.status === 'connected' ? '✓ Connected' : '✕ Error'}: {connection.health.message}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-on-surface-variant/60 font-mono">Not tested yet</span>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
-                        API Key / Secret Token
-                      </label>
-                      <input
-                        type="password"
-                        placeholder={provider.type === 'ollama' ? 'Optional for local Ollama' : 'Enter API Key...'}
-                        value={provider.apiKey}
-                        onChange={(e) =>
-                          updateAiProvider({ ...provider, apiKey: e.target.value })
-                        }
-                        className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
-                        Default Model
-                      </label>
-                      <select
-                        value={provider.defaultModel}
-                        onChange={(e) =>
-                          updateAiProvider({ ...provider, defaultModel: e.target.value })
-                        }
-                        className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
-                      >
-                        {provider.availableModels.map((m: string) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <button
+                      onClick={() => handleTestAiConnection(provider.id)}
+                      disabled={testingId === provider.id}
+                      className="bg-surface-container-high hover:bg-border-slate text-on-surface border border-border-slate px-3 py-1 rounded text-xs font-display font-semibold transition-colors shrink-0"
+                    >
+                      {testingId === provider.id ? <LoadingSpinner size="sm" label="" /> : 'Test Connection'}
+                    </button>
                   </div>
                 </div>
-
-                {/* Status & Test Action */}
-                <div className="mt-4 pt-3 border-t border-border-slate/60 flex items-center justify-between">
-                  <div className="min-w-0 flex-1 pr-2">
-                    {provider.lastTestedAt ? (
-                      <span
-                        className={`text-[10px] font-mono truncate block ${
-                          provider.lastTestSuccess ? 'text-emerald-400' : 'text-red-400'
-                        }`}
-                      >
-                        {provider.lastTestSuccess ? '✓ Connected' : '✕ Error'}: {provider.lastTestMessage}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-on-surface-variant/60 font-mono">Not tested yet</span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => handleTestAiConnection(provider)}
-                    disabled={testingId === provider.id}
-                    className="bg-surface-container-high hover:bg-border-slate text-on-surface border border-border-slate px-3 py-1 rounded text-xs font-display font-semibold transition-colors shrink-0"
-                  >
-                    {testingId === provider.id ? <LoadingSpinner size="sm" label="" /> : 'Test Connection'}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
+
 
       {/* TTS Providers Tab */}
       {activeTab === 'tts' && (
@@ -258,11 +318,27 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {ttsProviders.map((provider) => (
+            {ttsProviders.map((provider) => {
+              const config = ttsConfigs?.find(c => c.providerId === provider.id) || {
+                id: crypto.randomUUID(),
+                providerId: provider.id,
+                enabled: false,
+                apiKey: '',
+                baseUrl: '',
+                defaultVoiceId: '',
+                defaultModelId: '',
+                streamingEnabled: false,
+                timeoutMs: 30000,
+                retryCount: 3,
+              } as TTSProviderConfiguration;
+              
+              const connection = ttsProviderManager.getConnection(provider.id);
+
+              return (
               <div
                 key={provider.id}
                 className={`surface-panel p-5 rounded-xl border transition-all flex flex-col justify-between ${
-                  provider.enabled ? 'border-border-slate' : 'border-border-slate/40 opacity-70'
+                  config.enabled ? 'border-border-slate' : 'border-border-slate/40 opacity-70'
                 }`}
               >
                 <div>
@@ -275,15 +351,17 @@ export const SettingsView: React.FC = () => {
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={provider.enabled}
+                        checked={config.enabled}
                         onChange={(e) =>
-                          updateTtsProvider({ ...provider, enabled: e.target.checked })
+                          updateTtsConfig({ ...config, enabled: e.target.checked })
                         }
                         className="sr-only peer"
                       />
                       <div className="w-9 h-5 bg-matte-black peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-surface after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-muted-gold"></div>
                     </label>
                   </div>
+                  
+                  <p className="text-[10px] text-on-surface-variant mb-4">{provider.description}</p>
 
                   <div className="space-y-3">
                     <div>
@@ -292,9 +370,9 @@ export const SettingsView: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        value={provider.endpointUrl}
+                        value={config.baseUrl}
                         onChange={(e) =>
-                          updateTtsProvider({ ...provider, endpointUrl: e.target.value })
+                          updateTtsConfig({ ...config, baseUrl: e.target.value })
                         }
                         className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
                       />
@@ -307,44 +385,25 @@ export const SettingsView: React.FC = () => {
                       <input
                         type="password"
                         placeholder="Enter API Key..."
-                        value={provider.apiKey}
+                        value={config.apiKey}
                         onChange={(e) =>
-                          updateTtsProvider({ ...provider, apiKey: e.target.value })
+                          updateTtsConfig({ ...config, apiKey: e.target.value })
                         }
                         className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-display uppercase text-on-surface-variant mb-1">
-                        Default Voice / Model
-                      </label>
-                      <select
-                        value={provider.defaultModel}
-                        onChange={(e) =>
-                          updateTtsProvider({ ...provider, defaultModel: e.target.value })
-                        }
-                        className="w-full bg-matte-black border border-border-slate rounded p-2 text-xs font-mono text-on-surface focus:border-muted-gold outline-none"
-                      >
-                        {provider.availableModels.map((m: string) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-border-slate/60 flex items-center justify-between">
                   <div className="min-w-0 flex-1 pr-2">
-                    {provider.lastTestedAt ? (
+                    {connection?.health?.lastTestedAt ? (
                       <span
                         className={`text-[10px] font-mono truncate block ${
-                          provider.lastTestSuccess ? 'text-emerald-400' : 'text-red-400'
+                          connection.health.status === 'connected' ? 'text-emerald-400' : 'text-red-400'
                         }`}
                       >
-                        {provider.lastTestSuccess ? '✓ Ready' : '✕ Error'}: {provider.lastTestMessage}
+                        {connection.health.status === 'connected' ? '✓ Ready' : '✕ Error'}: {connection.health.message}
                       </span>
                     ) : (
                       <span className="text-[10px] text-on-surface-variant/60 font-mono">Not tested yet</span>
@@ -352,7 +411,7 @@ export const SettingsView: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => handleTestTtsSynthesis(provider)}
+                    onClick={() => handleTestTtsSynthesis(provider.id)}
                     disabled={testingId === provider.id}
                     className="bg-surface-container-high hover:bg-border-slate text-on-surface border border-border-slate px-3 py-1 rounded text-xs font-display font-semibold transition-colors shrink-0"
                   >
@@ -360,7 +419,7 @@ export const SettingsView: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}

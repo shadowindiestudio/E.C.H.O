@@ -16,12 +16,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setActiveProjectId,
     setActiveNav,
     voices,
-    aiProviders,
+    aiConfigs,
     ttsProviders,
+    ttsConfigs,
   } = useApp();
 
-  const enabledAi = aiProviders.filter((p) => p.enabled);
-  const enabledTts = ttsProviders.filter((p) => p.enabled);
+  const enabledAi = aiConfigs.filter((p) => p.enabled);
+  const enabledTts = ttsConfigs.filter((p) => p.enabled);
 
   return (
     <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6">

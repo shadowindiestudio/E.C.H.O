@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { BackendPendingBanner } from '../common/BackendPendingBanner';
 
 export const AnalyticsView: React.FC = () => {
-  const { setActiveNav, aiProviders, ttsProviders } = useApp();
+  const { setActiveNav, aiConfigs, ttsProviders, ttsConfigs } = useApp();
 
   return (
     <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6">
@@ -17,14 +17,14 @@ export const AnalyticsView: React.FC = () => {
         <div className="surface-panel p-5 rounded-xl border border-border-slate">
           <span className="text-[10px] uppercase font-display text-on-surface-variant">Active AI LLM Models</span>
           <p className="text-2xl font-display font-bold text-muted-gold mt-1">
-            {aiProviders.filter((p) => p.enabled).length} Enabled
+            {aiConfigs.filter((p) => p.enabled).length} Enabled
           </p>
         </div>
 
         <div className="surface-panel p-5 rounded-xl border border-border-slate">
           <span className="text-[10px] uppercase font-display text-on-surface-variant">Active TTS Engines</span>
           <p className="text-2xl font-display font-bold text-muted-gold mt-1">
-            {ttsProviders.filter((p) => p.enabled).length} Active
+            {ttsConfigs.filter((p) => p.enabled).length} Active
           </p>
         </div>
 

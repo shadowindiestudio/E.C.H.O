@@ -23,6 +23,8 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { CommandPaletteModal } from './components/common/CommandPaletteModal';
 
 import { playVoiceTone, stopVoiceTone } from './utils/audioSynth';
+import { voicePreviewService } from './services/tts/VoicePreviewService';
+import { playbackQueueService } from './services/tts/PlaybackQueueService';
 
 function AppContent() {
   const { activeNav, setActiveNav, voices, setVoices, searchQuery } = useApp();
@@ -40,12 +42,12 @@ function AppContent() {
   const selectedVoice = (selectedVoiceId && voices.find((v) => v.id === selectedVoiceId)) || voices[0] || null;
 
   // Handle Play/Pause Audio Tone
-  const handleTogglePlayVoice = (id: string | null, e?: React.MouseEvent) => {
+  const handleTogglePlayVoice = async (id: string | null, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!id) return;
 
     if (playingVoiceId === id) {
-      stopVoiceTone();
+      playbackQueueService.stop();
       setPlayingVoiceId(null);
       setPlaybackTime(0);
       return;
@@ -57,17 +59,26 @@ function AppContent() {
     setPlayingVoiceId(id);
     setSelectedVoiceId(id);
 
-    playVoiceTone(
-      voice.category,
-      (current, duration) => {
-        setPlaybackTime(current);
-        setPlaybackDuration(duration);
-      },
-      () => {
+    try {
+      const preview = await voicePreviewService.generatePreview(voice, "This is a preview of the selected TTS voice.");
+      playbackQueueService.addToQueue(preview);
+      playbackQueueService.play();
+      
+      // In a full implementation, PlaybackQueueService should emit timeupdate events
+      // For now, we simulate a 3-second playback duration
+      setPlaybackDuration(3);
+      setPlaybackTime(0);
+      
+      setTimeout(() => {
         setPlayingVoiceId(null);
         setPlaybackTime(0);
-      }
-    );
+        playbackQueueService.stop();
+      }, 3000);
+      
+    } catch (err) {
+      addToast('Preview Error', String(err), 'error');
+      setPlayingVoiceId(null);
+    }
   };
 
   // Toggle favorite

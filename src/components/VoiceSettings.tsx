@@ -32,7 +32,7 @@ export const VoiceSettings: React.FC<VoiceSettingsProps> = ({
     );
   }
 
-  const handleSliderChange = (key: 'stability' | 'similarity' | 'styleExaggeration', val: number) => {
+  const handleSliderChange = (key: 'stability' | 'similarity' | 'styleExaggeration' | 'pitch' | 'speed' | 'volume', val: number) => {
     onUpdateVoiceSettings({
       ...voice,
       [key]: val,
@@ -200,6 +200,42 @@ export const VoiceSettings: React.FC<VoiceSettingsProps> = ({
               Amplifies character nuance and emotional cadence in speech synthesis.
             </p>
           </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-display font-semibold text-on-surface">Pitch</label>
+              <span className="text-[10px] bg-dark-slate border border-border-slate px-1.5 py-0.5 rounded text-muted-gold font-mono">
+                {voice.pitch || 0}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              value={voice.pitch || 0}
+              onChange={(e) => handleSliderChange('pitch', parseInt(e.target.value, 10))}
+              className="w-full"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-display font-semibold text-on-surface">Speed</label>
+              <span className="text-[10px] bg-dark-slate border border-border-slate px-1.5 py-0.5 rounded text-muted-gold font-mono">
+                {voice.speed || 1.0}x
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.25"
+              max="2.0"
+              step="0.05"
+              value={voice.speed || 1.0}
+              onChange={(e) => handleSliderChange('speed', parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
         </div>
 
         {/* Metadata Details */}
@@ -215,6 +251,10 @@ export const VoiceSettings: React.FC<VoiceSettingsProps> = ({
           <div className="flex justify-between">
             <span>Gender Tone:</span>
             <span className="font-mono text-on-surface">{voice.gender || 'Neutral'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Age Profile:</span>
+            <span className="font-mono text-on-surface">{voice.age || 'Adult'}</span>
           </div>
         </div>
       </div>

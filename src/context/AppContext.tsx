@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { NavItem, Project, ProviderConfig, SystemSettings, Voice, Story } from '../types';
+import { NavItem, Project, ProviderConfig, SystemSettings, Voice, Story, ProviderConfiguration, Provider, TTSProvider, TTSProviderConfiguration } from '../types';
 import { projectService } from '../services/projectService';
-import { aiProviderService } from '../services/aiProviderService';
-import { ttsProviderService } from '../services/ttsProviderService';
+import { aiProviderManager } from '../services/ai/AIProviderManager';
+import { ttsProviderManager } from '../services/tts/TTSProviderManager';
 import { storageService } from '../services/storageService';
 import { storyService } from '../services/pipeline/StoryService';
 import { INITIAL_VOICES } from '../data/voices';
@@ -21,8 +21,10 @@ interface AppContextValue {
   setActiveStoryId: (id: string | null) => void;
   saveStory: (story: Story) => void;
 
-  aiProviders: ProviderConfig[];
-  ttsProviders: ProviderConfig[];
+  aiProviders: Provider[];
+  aiConfigs: ProviderConfiguration[];
+  ttsProviders: TTSProvider[];
+  ttsConfigs: TTSProviderConfiguration[];
   systemSettings: SystemSettings;
   voices: Voice[];
   searchQuery: string;
@@ -32,8 +34,8 @@ interface AppContextValue {
   createProject: (title: string, description: string, genre: Project['genre']) => Project;
   saveProject: (project: Project) => void;
   deleteProject: (id: string) => void;
-  updateAiProvider: (config: ProviderConfig) => void;
-  updateTtsProvider: (config: ProviderConfig) => void;
+  updateAiConfig: (config: ProviderConfiguration) => void;
+  updateTtsConfig: (config: TTSProviderConfiguration) => void;
   updateSystemSettings: (settings: Partial<SystemSettings>) => void;
   setVoices: React.Dispatch<React.SetStateAction<Voice[]>>;
 }
@@ -67,8 +69,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return list[0]?.id || null;
   });
 
-  const [aiProviders, setAiProviders] = useState<ProviderConfig[]>(() => aiProviderService.getProviders());
-  const [ttsProviders, setTtsProviders] = useState<ProviderConfig[]>(() => ttsProviderService.getProviders());
+  const [aiProviders] = useState<Provider[]>(() => aiProviderManager.getAllProviders());
+  const [aiConfigs, setAiConfigs] = useState<ProviderConfiguration[]>(() => aiProviderManager.getConfigurations());
+  const [ttsProviders] = useState<TTSProvider[]>(() => ttsProviderManager.getAllProviders());
+  const [ttsConfigs, setTtsConfigs] = useState<TTSProviderConfiguration[]>(() => ttsProviderManager.getConfigurations());
+  
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() =>
     storageService.get<SystemSettings>('system_settings', DEFAULT_SETTINGS)
   );
@@ -124,14 +129,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [activeProjectId]);
 
-  const updateAiProvider = useCallback((config: ProviderConfig) => {
-    const updated = aiProviderService.saveProvider(config);
-    setAiProviders(updated);
+  const updateAiConfig = useCallback((config: ProviderConfiguration) => {
+    aiProviderManager.saveConfiguration(config);
+    setAiConfigs(aiProviderManager.getConfigurations());
   }, []);
 
-  const updateTtsProvider = useCallback((config: ProviderConfig) => {
-    const updated = ttsProviderService.saveProvider(config);
-    setTtsProviders(updated);
+  const updateTtsConfig = useCallback((config: TTSProviderConfiguration) => {
+    ttsProviderManager.saveConfiguration(config);
+    setTtsConfigs(ttsProviderManager.getConfigurations());
   }, []);
 
   const updateSystemSettings = useCallback((newPartial: Partial<SystemSettings>) => {
@@ -153,7 +158,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveStoryId,
         saveStory,
         aiProviders,
+        aiConfigs,
         ttsProviders,
+        ttsConfigs,
         systemSettings,
         voices,
         searchQuery,
@@ -161,8 +168,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createProject,
         saveProject,
         deleteProject,
-        updateAiProvider,
-        updateTtsProvider,
+        updateAiConfig,
+        updateTtsConfig,
         updateSystemSettings,
         setVoices,
       }}

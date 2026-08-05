@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Voice } from '../types';
+import { useApp } from '../context/AppContext';
 
 interface NewVoiceModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export const NewVoiceModal: React.FC<NewVoiceModalProps> = ({
   const [language, setLanguage] = useState('English (US)');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Neutral'>('Male');
   const [tagsInput, setTagsInput] = useState('');
+  const { ttsProviders } = useApp();
+  const [providerId, setProviderId] = useState<string>(ttsProviders[0]?.id || '');
 
   if (!isOpen) return null;
 
@@ -108,6 +111,22 @@ export const NewVoiceModal: React.FC<NewVoiceModalProps> = ({
             />
           </div>
 
+          <div>
+            <label className="block font-display text-xs text-on-surface font-semibold uppercase tracking-wider mb-1">
+              TTS Provider Engine
+            </label>
+            <select
+              value={providerId}
+              onChange={(e) => setProviderId(e.target.value)}
+              className="w-full bg-matte-black border border-border-slate rounded p-2.5 text-xs text-on-surface focus:border-muted-gold outline-none"
+            >
+              {ttsProviders.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-display text-xs text-on-surface font-semibold uppercase tracking-wider mb-1">
@@ -141,8 +160,6 @@ export const NewVoiceModal: React.FC<NewVoiceModalProps> = ({
               </select>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-display text-xs text-on-surface font-semibold uppercase tracking-wider mb-1">
                 Language / Accent
@@ -168,7 +185,6 @@ export const NewVoiceModal: React.FC<NewVoiceModalProps> = ({
                 className="w-full bg-matte-black border border-border-slate rounded p-2.5 text-xs text-on-surface focus:border-muted-gold outline-none"
               />
             </div>
-          </div>
 
           {/* Modal Actions */}
           <div className="pt-4 border-t border-border-slate flex justify-end gap-3">

@@ -8,10 +8,10 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) => {
-  const { activeNav, setActiveNav, projects, voices, aiProviders, ttsProviders } = useApp();
+  const { activeNav, setActiveNav, projects, voices, aiConfigs, ttsProviders, ttsConfigs } = useApp();
 
-  const enabledAiCount = aiProviders.filter((p) => p.enabled).length;
-  const enabledTtsCount = ttsProviders.filter((p) => p.enabled).length;
+  const enabledAiCount = aiConfigs.filter((p) => p.enabled).length;
+  const enabledTtsCount = ttsConfigs.filter((p) => p.enabled).length;
 
   const navItems: { id: NavItem; label: string; icon: string; badge?: string | number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
